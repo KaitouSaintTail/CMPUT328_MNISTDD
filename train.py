@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 import datetime
 import data_helper
-from cnn_mnistdd import CNN
+from cnn_mnistdd_shallow import CNN
 import os
 
 # Parameters settings
@@ -90,7 +90,9 @@ checkpoint_prefix_2 = os.path.join(checkpoint_dir, "model_one")
 checkpoint_prefix_3 = os.path.join(checkpoint_dir, "model_score")
 if not os.path.exists(checkpoint_dir):
     os.makedirs(checkpoint_dir)
-saver = tf.train.Saver(tf.global_variables(), max_to_keep=1)
+saver_1 = tf.train.Saver(tf.global_variables(), max_to_keep=1)
+saver_2 = tf.train.Saver(tf.global_variables(), max_to_keep=1)
+saver_3 = tf.train.Saver(tf.global_variables(), max_to_keep=1)
 
 # Train Step and Dev Step
 def train_step(x_batch, y_batch):
@@ -155,31 +157,32 @@ for train_batch in train_batches:
             one_true_per_batch = all_true_per_batch + np.count_nonzero(res==1)
             test_all_true += all_true_per_batch
             test_one_true += one_true_per_batch
+        test_score += test_all_true*3 + test_one_true-test_all_true
 
         time_str = datetime.datetime.now().isoformat()
         all_true_acc = test_all_true/len(y_test)
         one_true_acc = test_one_true/len(y_test)
-        test_score += test_all_true*3 + test_one_true-test_all_true
         print("{}: Evaluation Summary, Epoch {}, Loss {:g}, All True Acc {:g}, One True Acc {:g}, Score {:g}".format(
               time_str, int(current_step//num_batches_per_epoch)+1, sum_loss/i, all_true_acc, one_true_acc, test_score))
         if all_true_acc > max_all_acc:
             max_all_acc = all_true_acc
             max_all_step = current_step
             if all_true_acc>0.96:
-                path = saver.save(sess, checkpoint_prefix_1, global_step=current_step)
+                path = saver_1.save(sess, checkpoint_prefix_1, global_step=current_step)
                 print("Saved current model checkpoint with max all accuracy to {}".format(path))
         print("{}: Current Max All Acc {:g} in Iteration {}".format(time_str, max_all_acc, max_all_step))
         if one_true_acc > max_one_acc:
             max_one_acc = one_true_acc
             max_one_step = current_step
             if one_true_acc>0.995:
-                path = saver.save(sess, checkpoint_prefix_2, global_step=current_step)
+                path = saver_2.save(sess, checkpoint_prefix_2, global_step=current_step)
                 print("Saved current model checkpoint with max one accuracy to {}".format(path))
         print("{}: Current Max One Acc {:g} in Iteration {}".format(time_str, max_one_acc, max_one_step))
+
         if test_score > max_score:
             max_score = test_score
             max_score_step = current_step
-            if test_score>14550:
-                path = saver.save(sess, checkpoint_prefix_3, global_step=current_step)
+            if max_score>14650:
+                path = saver_3.save(sess, checkpoint_prefix_3, global_step=current_step)
                 print("Saved current model checkpoint with maxscore to {}".format(path))
         print("{}: Current Max Score {:g} in Iteration {}\n".format(time_str, max_score, max_score_step))
