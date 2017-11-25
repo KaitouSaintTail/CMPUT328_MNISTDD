@@ -10,10 +10,20 @@ def load_dataset(dataset_path, zca_whitening=True):
     y_train = np.load(os.path.join(dataset_path, "train_Y.npy"))
     x_valid = np.load(os.path.join(dataset_path, "valid_X.npy")).astype('float32')/255.
     y_valid = np.array(np.load(os.path.join(dataset_path, "valid_Y.npy")))
+# ADDED
+    bbox_train = np.load(os.path.join(dataset_path, "train_bboxes.npy"))
+    bbox_valid = np.load(os.path.join(dataset_path, "valid_bboxes.npy"))
 
     y_train = np.array([to_one_hot_encodings(n) for n in y_train])
     y_valid = np.array([to_one_hot_encodings(n) for n in y_valid])
     #zca_principal_components(x_train)
+
+# ADDED
+    # resize bounding boxes into n x 8
+    bbox_train = np.array([n.reshape(8, 1, order='F') for n in bbox_train])
+    bbox_train = np.reshape(bbox_train, (-1, 8))
+    bbox_valid = np.array([n.reshape(8, 1, order='F') for n in bbox_valid])
+    bbox_valid = np.reshape(bbox_train, (-1, 8))
 
     if zca_whitening:
         # data whitening
@@ -24,7 +34,8 @@ def load_dataset(dataset_path, zca_whitening=True):
         white_x_valid = np.dot(x_valid, principal_components)
         x_valid = np.reshape(white_x_valid, x_valid.shape)
 
-    return x_train, y_train, x_valid, y_valid
+# ADDED
+    return x_train, y_train, x_valid, y_valid, bbox_train, bbox_valid
 
 def zca_principal_components(x_train, zca_epsilon=0.1):
     """Calculate ZCA Matrix over training set and save 
