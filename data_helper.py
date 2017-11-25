@@ -19,11 +19,15 @@ def load_dataset(dataset_path, zca_whitening=True):
     #zca_principal_components(x_train)
 
 # ADDED
-    # resize bounding boxes into n x 8
-    bbox_train = np.array([n.reshape(8, 1, order='F') for n in bbox_train])
-    bbox_train = np.reshape(bbox_train, (-1, 8))
-    bbox_valid = np.array([n.reshape(8, 1, order='F') for n in bbox_valid])
-    bbox_valid = np.reshape(bbox_train, (-1, 8))
+    # resize bounding boxes into n x num_digits x 2 since boxes are fixed size
+    bbox_train = bbox_train[:,:,:-2]
+    bbox_valid = bbox_valid[:,:,:-2]
+
+    # resize bounding boxes into n x 4
+    bbox_train = np.array([n.reshape(4, 1, order='F') for n in bbox_train])
+    bbox_train = np.reshape(bbox_train, (-1, 4))
+    bbox_valid = np.array([n.reshape(4, 1, order='F') for n in bbox_valid])
+    bbox_valid = np.reshape(bbox_train, (-1, 4))
 
     if zca_whitening:
         # data whitening
