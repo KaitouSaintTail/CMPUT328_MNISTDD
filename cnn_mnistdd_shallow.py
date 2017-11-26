@@ -6,43 +6,29 @@ kernel_initializer = tf.truncated_normal_initializer(stddev=0.1)
 
 # ADDED
 # Bounding box intersection over union calculation
+# predictions and ground_truth have shape (?, num_digits, 2)
 def intersection_over_union(predictions, ground_truth):
     iou_counter = 0
-    for pred, gt in zip(predictions, ground_truth):
-        # box 1
-        x1a = max(gt[1], pred[1])
-        y1a = max(gt[0], pred[0])
-        x1b = min(gt[1], pred[1]) + 28
-        y1b = min(gt[0], pred[0]) + 28
+    for bbox_pred, bbox_gt in zip(predictions, ground_truth):
+        ious = []
+        for coords_pred, coords_gt in zip(bbox_pred, bbox_gt):
+            # compute the area of intersection
+            # box 1
+            x_top_left = max(coords_gt[1], coords_pred[1])
+            y_top_left = max(coords_gt[0], coords_pred[0])
+            x_bottom_right = min(coords_gt[1], coords_pred[1]) + 28
+            y_bottom_right = min(coords_gt[0], coords_pred[0]) + 28
 
-        # box 2
-        x2a = max(gt[3], pred[3])
-        y2a = max(gt[2], pred[2])
-        x2b = min(gt[3], pred[3]) + 28
-        y2b = min(gt[2], pred[2]) + 28
+            intersection = (x_bottom_right - x_top_left + 1) * (y_bottom_right - y_top_left + 1)
 
-        # compute area of intersection
-        intersection1 = (x1b - x1a + 1) * (y1b - y1a + 1)
-        intersection2 = (x2b - x2a + 1) * (y2b - y2a + 1)
+            # compute the union
+            gtArea = predArea = 29 * 29
+            union = gtArea + predArea - intersection
 
-        # compute the area of both the prediction and ground truth rectangles
-        # always the same: 29 * 29
-        # gtArea1 = ((gt[0] + 28) - gt[0] + 1) * ((gt[1] + 28) - gt[1] + 1)
-        # predArea1 = ((pred[0] + 28) - gt[0] + 1) * ((pred[1] + 28) - pred[1] + 1)
-        #
-        # gtArea2 = ((gt[2] + 28) - gt[2] + 1) * ((gt[3] + 28) - gt[3] + 1)
-        # predArea2 = ((pred[2] + 28) - gt[2] + 1) * ((pred[3] + 28) - pred[3] + 1)
-        gtArea1 = predArea1 = gtArea2 = predArea2 = 29 * 29
+            # compute the intersection over union
+            ious.append(intersection / float(union))
 
-        # compute the union
-        union1 = gtArea1 + predArea1 - intersection1
-        union2 = gtArea2 + predArea2 - intersection2
-
-        # compute the intersection over union
-        iou1 = intersection1 / float(union1)
-        iou2 = intersection2 / float(union2)
-
-        iou = np.mean([iou1, iou2])
+        iou = np.mean(ious)
         if iou >= 0.5:
             iou_counter += 1
 
