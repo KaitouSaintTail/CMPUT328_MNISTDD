@@ -97,6 +97,13 @@ class CNN():
             out = tf.matmul(self.fc1, w) + b
             self.fc = tf.reshape(out, [-1, num_digits, num_classes])
 
+# ADDED
+        with tf.variable_scope('bbox_fc'):
+            w = tf.get_variable('w', [self.fc1.get_shape()[1], 2 * num_digits], initializer=kernel_initializer)
+            b = tf.get_variable('b', [2 * num_digits], initializer=bias_initializer)
+            out = tf.matmul(self.fc1, w) + b
+            self.fc = tf.reshape(out, [-1], num_digits, 2)
+
         # Cross-entropy loss
         with tf.name_scope("loss"):
             self.predictions = tf.argmax(self.fc, 2, name="Predictions")
