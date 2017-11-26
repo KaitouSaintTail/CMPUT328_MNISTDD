@@ -8,7 +8,7 @@ kernel_initializer = tf.truncated_normal_initializer(stddev=0.1)
 # Bounding box intersection over union calculation
 # predictions and ground_truth have shape (?, num_digits, 2)
 def intersection_over_union(predictions, ground_truth):
-    iou_counter = 0
+    valid = 0
     for bbox_pred, bbox_gt in zip(predictions, ground_truth):
         ious = []
         for coords_pred, coords_gt in zip(bbox_pred, bbox_gt):
@@ -30,9 +30,9 @@ def intersection_over_union(predictions, ground_truth):
 
         iou = np.mean(ious)
         if iou >= 0.5:
-            iou_counter += 1
+            valid += 1
 
-    return iou_counter / float(len(ground_truth))
+    return valid / float(len(ground_truth))
 
 def Conv(inputs, kernel_size, strides, num_filters, weight_decay, name):
     '''
@@ -67,6 +67,9 @@ class CNN():
         self.input_y = tf.placeholder(tf.float32, [None, num_classes*num_digits], name="input_y")
         self.input_y_reshaped = tf.reshape(self.input_y, [-1, num_digits, num_classes])
         self.dropout_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
+# ADDED
+        self.input_bbox = tf.placeholder(tf.float32, [None, 2 * num_digits], name="input_bbox")
+        self.input_bbox_reshaped = tf.reshape(self.input_bbox, [-1, num_digits, 2])
 
         # CNN Architecture
         self.conv1 = Conv(inputs=self.input_x_reshaped, kernel_size=3, strides=1, num_filters=64, weight_decay=weight_decay, name="conv1")
