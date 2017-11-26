@@ -112,6 +112,14 @@ class CNN():
             regularization_losses = sum(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
             self.loss = tf.reduce_mean(losses) + regularization_losses
 
+# ADDED
+        # L2 euclidean loss
+        with tf.name_scope("bbox_loss"):
+            # shape (?, 2, 2)
+            self.predictions = self.fc
+            self.ground_truth = self.input_bbox_reshaped
+            self.loss = tf.sqrt(tf.reduce_mean(tf.square(tf.subtract(self.ground_truth, self.predictions))))
+
         # Accuracy
         with tf.name_scope("accuracy"):
             correct_predictions = tf.equal(self.predictions, self.ground_truth)
