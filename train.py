@@ -32,9 +32,11 @@ print("")
 
 # Loading database here
 print("Loading database...")
-x_train, y_train, x_test, y_test = data_helper.load_dataset(FLAGS.database_path, zca_whitening=FLAGS.zca_whitening)
+# ADDED
+x_train, y_train, x_test, y_test, bbox_train, bbox_valid = data_helper.load_dataset(FLAGS.database_path, zca_whitening=FLAGS.zca_whitening)
 num_batches_per_epoch = int((len(x_train)-1)/FLAGS.batch_size) + 1
-print("Shape:",x_train.shape, y_train.shape, x_test.shape, y_test.shape)
+# ADDED
+print("Shape:",x_train.shape, y_train.shape, x_test.shape, y_test.shape, bbox_train.shape, bbox_valid.shape)
 print("Success!")
 
 sess = tf.Session()
