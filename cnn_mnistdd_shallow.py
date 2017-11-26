@@ -15,7 +15,6 @@ def intersection_over_union(predictions, ground_truth, threshold):
         ious = []
         for coords_pred, coords_gt in zip(bbox_pred, bbox_gt):
             # compute the area of intersection
-            # box 1
             x_top_left = max(coords_gt[1], coords_pred[1])
             y_top_left = max(coords_gt[0], coords_pred[0])
             x_bottom_right = min(coords_gt[1], coords_pred[1]) + 28
