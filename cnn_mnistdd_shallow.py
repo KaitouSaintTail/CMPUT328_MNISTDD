@@ -124,3 +124,9 @@ class CNN():
         with tf.name_scope("accuracy"):
             correct_predictions = tf.equal(self.predictions, self.ground_truth)
             self.accuracy = tf.reduce_mean(tf.cast(correct_predictions, "float"), name="accuracy")
+
+# ADDED
+        with tf.name_scope("bbox_accuracy"):
+            self.accuracy = intersection_over_union(
+                predictions=self.predictions, ground_truth=self.ground_truth, threshold=0.5) \
+                            / float(len(self.ground_truth))
