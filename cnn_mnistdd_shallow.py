@@ -7,7 +7,6 @@ kernel_initializer = tf.truncated_normal_initializer(stddev=0.1)
 # ADDED
 # Bounding box intersection over union calculation
 def intersection_over_union(predictions, ground_truth):
-    # max, min - that's if the two corners are switched
     iou_counter = 0
     for pred, gt in zip(predictions, ground_truth):
         # box 1
