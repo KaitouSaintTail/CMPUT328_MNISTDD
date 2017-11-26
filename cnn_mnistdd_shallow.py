@@ -5,9 +5,11 @@ bias_initializer = tf.constant_initializer(0.1)
 kernel_initializer = tf.truncated_normal_initializer(stddev=0.1)
 
 # ADDED
-# Bounding box intersection over union calculation
+# Returns the number of predictions with bounding boxes that
+# meet the threshold for overlap (intersection over union)
+# with ground truth values
 # predictions and ground_truth have shape (?, num_digits, 2)
-def intersection_over_union(predictions, ground_truth):
+def intersection_over_union(predictions, ground_truth, threshold):
     valid = 0
     for bbox_pred, bbox_gt in zip(predictions, ground_truth):
         ious = []
@@ -29,10 +31,10 @@ def intersection_over_union(predictions, ground_truth):
             ious.append(intersection / float(union))
 
         iou = np.mean(ious)
-        if iou >= 0.5:
+        if iou >= threshold:
             valid += 1
 
-    return valid / float(len(ground_truth))
+    return valid
 
 def Conv(inputs, kernel_size, strides, num_filters, weight_decay, name):
     '''
