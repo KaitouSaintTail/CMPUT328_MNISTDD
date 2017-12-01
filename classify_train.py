@@ -32,11 +32,10 @@ print("")
 
 # Loading database here
 print("Loading database...")
-# ADDED
-x_train, y_train, x_test, y_test, bbox_train, bbox_valid = data_helper.load_dataset(FLAGS.database_path, zca_whitening=FLAGS.zca_whitening)
+x_train, y_train, x_valid, y_valid = data_helper.load_dataset(FLAGS.database_path, zca_whitening=FLAGS.zca_whitening)
+bbox_train, bbox_valid = data_helper.load_bbox(FLAGS.database_path)
 num_batches_per_epoch = int((len(x_train)-1)/FLAGS.batch_size) + 1
-# ADDED
-print("Shape:",x_train.shape, y_train.shape, x_test.shape, y_test.shape, bbox_train.shape, bbox_valid.shape)
+print("Shape:",x_train.shape, y_train.shape, x_valid.shape, y_valid.shape, bbox_train.shape, bbox_valid.shape)
 print("Success!")
 
 sess = tf.Session()
@@ -48,9 +47,6 @@ cnn = CNN()
 global_step = tf.Variable(0, name="global_step", trainable=False)
 learning_rate = tf.train.exponential_decay(FLAGS.learning_rate, global_step, FLAGS.num_epochs*num_batches_per_epoch, 0.95, staircase=True)
 optimizer = tf.train.MomentumOptimizer(learning_rate, 0.9)
-#lr_decay_fn = lambda lr, global_step : tf.train.exponential_decay(lr, global_step, FLAGS.num_epochs*num_batches_per_epoch, 0.95, staircase=True)
-#train_op = tf.contrib.layers.optimize_loss(loss=cnn.loss, global_step=global_step, clip_gradients=4.0,
-#    learning_rate=FLAGS.learning_rate, optimizer=lambda lr: optimizer, learning_rate_decay_fn=lr_decay_fn)
 grads_and_vars = optimizer.compute_gradients(cnn.loss)
 train_op = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
 # Initialize Graph
@@ -78,23 +74,18 @@ grad_summaries_merged = tf.summary.merge(grad_summaries)
 
 # Summaries for loss and accuracy
 loss_summary = tf.summary.scalar("loss", cnn.loss)
-acc_summary = tf.summary.scalar("accuracy", cnn.accuracy)
 # Train Summaries
-train_summary_op = tf.summary.merge([loss_summary, acc_summary, hist_summaries_merged, grad_summaries_merged])
+train_summary_op = tf.summary.merge([loss_summary, hist_summaries_merged, grad_summaries_merged])
 train_summary_dir = os.path.join(out_dir, "summaries", "train")
 train_summary_writer = tf.summary.FileWriter(train_summary_dir, sess.graph)
 
 # Saver
 # Tensorflow assumes this directory already exists so we need to create it
 checkpoint_dir = os.path.abspath(os.path.join(out_dir, "checkpoints"))
-checkpoint_prefix_1 = os.path.join(checkpoint_dir, "model_all")
-checkpoint_prefix_2 = os.path.join(checkpoint_dir, "model_one")
-checkpoint_prefix_3 = os.path.join(checkpoint_dir, "model_score")
+checkpoint_prefix = os.path.join(checkpoint_dir, "model_bbox")
 if not os.path.exists(checkpoint_dir):
     os.makedirs(checkpoint_dir)
-saver_1 = tf.train.Saver(tf.global_variables(), max_to_keep=1)
-saver_2 = tf.train.Saver(tf.global_variables(), max_to_keep=1)
-saver_3 = tf.train.Saver(tf.global_variables(), max_to_keep=1)
+saver = tf.train.Saver(tf.global_variables(), max_to_keep=1)
 
 # Train Step and Dev Step
 def train_step(x_batch, y_batch):
@@ -105,9 +96,9 @@ def train_step(x_batch, y_batch):
                  cnn.input_y: y_batch, 
                  #cnn.is_training: True,
                  cnn.dropout_keep_prob: FLAGS.dropout_keep_prob}
-    _, step, loss, accuracy, summaries = sess.run([train_op, global_step, cnn.loss, cnn.accuracy, train_summary_op], feed_dict)
+    _, step, loss, summaries = sess.run([train_op, global_step, cnn.loss, train_summary_op], feed_dict)
     time_str = datetime.datetime.now().isoformat()
-    print("{}: Step {}, Epoch {}, Loss {:g}, Acc {:g}".format(time_str, step, int(step//num_batches_per_epoch)+1, loss, accuracy))
+    print("{}: Step {}, Epoch {}, Loss {:g}".format(time_str, step, int(step//num_batches_per_epoch)+1, loss))
     if step%100==0:
         train_summary_writer.add_summary(summaries, global_step=step)
 
@@ -123,14 +114,8 @@ def dev_step(x_batch, y_batch):
     time_str = datetime.datetime.now().isoformat()
     return preds, labels, loss
 
-max_all_acc = 0.0
-max_one_acc = 0.0
-max_all_step = 0
-max_one_step = 0
-max_score = 0
-max_score_step = 0
 # Generate batches
-train_batches = data_helper.batch_iter(list(zip(x_train, y_train)), FLAGS.batch_size, FLAGS.num_epochs)
+train_batches = data_helper.batch_iter(list(zip(x_train, bbox_train)), FLAGS.batch_size, FLAGS.num_epochs)
 # Training loop. For each batch...
 for train_batch in train_batches:
     x_batch, y_batch = zip(*train_batch)
@@ -139,52 +124,22 @@ for train_batch in train_batches:
     # Testing loop
     if current_step % FLAGS.evaluate_every == 0:
         print("\nEvaluation:")
-        test_batches = data_helper.batch_iter(list(zip(x_test, y_test)), FLAGS.batch_size, 1, shuffle=False)
-        test_all_true = 0
-        test_one_true = 0
-        test_score = 0
+        test_batches = data_helper.batch_iter(list(zip(x_valid, bbox_valid)), FLAGS.batch_size, 1, shuffle=False)
         sum_loss = 0
         i = 0
 
         for test_batch in test_batches:
-            x_test_batch, y_test_batch = zip(*test_batch)
-            preds, labels, test_loss = dev_step(x_test_batch, y_test_batch)
+            x_valid_batch, y_valid_batch = zip(*test_batch)
+            preds, labels, test_loss = dev_step(x_valid_batch, y_valid_batch)
             sum_loss += test_loss
             i += 1
-            # Handle predictions here
-            preds = np.array(preds)
-            labels = np.array(labels)
-            res = np.count_nonzero((np.array(preds)-np.array(labels))==0, axis=1)
-            all_true_per_batch = np.count_nonzero(res==2)
-            one_true_per_batch = all_true_per_batch + np.count_nonzero(res==1)
-            test_all_true += all_true_per_batch
-            test_one_true += one_true_per_batch
-        test_score += test_all_true*3 + test_one_true-test_all_true
 
         time_str = datetime.datetime.now().isoformat()
-        all_true_acc = test_all_true/len(y_test)
-        one_true_acc = test_one_true/len(y_test)
-        print("{}: Evaluation Summary, Epoch {}, Loss {:g}, All True Acc {:g}, One True Acc {:g}, Score {:g}".format(
-              time_str, int(current_step//num_batches_per_epoch)+1, sum_loss/i, all_true_acc, one_true_acc, test_score))
-        if all_true_acc > max_all_acc:
-            max_all_acc = all_true_acc
-            max_all_step = current_step
-            if all_true_acc>0.96:
-                path = saver_1.save(sess, checkpoint_prefix_1, global_step=current_step)
-                print("Saved current model checkpoint with max all accuracy to {}".format(path))
-        print("{}: Current Max All Acc {:g} in Iteration {}".format(time_str, max_all_acc, max_all_step))
-        if one_true_acc > max_one_acc:
-            max_one_acc = one_true_acc
-            max_one_step = current_step
-            if one_true_acc>0.995:
-                path = saver_2.save(sess, checkpoint_prefix_2, global_step=current_step)
-                print("Saved current model checkpoint with max one accuracy to {}".format(path))
-        print("{}: Current Max One Acc {:g} in Iteration {}".format(time_str, max_one_acc, max_one_step))
-
-        if test_score > max_score:
-            max_score = test_score
-            max_score_step = current_step
-            if max_score>14650:
-                path = saver_3.save(sess, checkpoint_prefix_3, global_step=current_step)
-                print("Saved current model checkpoint with maxscore to {}".format(path))
-        print("{}: Current Max Score {:g} in Iteration {}\n".format(time_str, max_score, max_score_step))
+        print("{}: Evaluation Summary, Epoch {}, Loss {:g}".format(
+              time_str, int(current_step//num_batches_per_epoch)+1, sum_loss/i))
+        #if test_score > max_score:
+        #    max_score = test_score
+        #    max_score_step = current_step
+        #    if max_score>14650:
+        #        path = saver_3.save(sess, checkpoint_prefix_3, global_step=current_step)
+        #        print("Saved current model checkpoint with maxscore to {}".format(path))

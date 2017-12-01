@@ -10,24 +10,10 @@ def load_dataset(dataset_path, zca_whitening=True):
     y_train = np.load(os.path.join(dataset_path, "train_Y.npy"))
     x_valid = np.load(os.path.join(dataset_path, "valid_X.npy")).astype('float32')/255.
     y_valid = np.array(np.load(os.path.join(dataset_path, "valid_Y.npy")))
-# ADDED
-    bbox_train = np.load(os.path.join(dataset_path, "train_bboxes.npy"))
-    bbox_valid = np.load(os.path.join(dataset_path, "valid_bboxes.npy"))
 
     y_train = np.array([to_one_hot_encodings(n) for n in y_train])
     y_valid = np.array([to_one_hot_encodings(n) for n in y_valid])
     #zca_principal_components(x_train)
-
-# ADDED
-    # resize bounding boxes into n x num_digits x 2 since boxes are fixed size
-    bbox_train = bbox_train[:,:,:-2]
-    bbox_valid = bbox_valid[:,:,:-2]
-
-    # resize bounding boxes into n x 4
-    bbox_train = np.array([n.reshape(4, 1, order='F') for n in bbox_train])
-    bbox_train = np.reshape(bbox_train, (-1, 4))
-    bbox_valid = np.array([n.reshape(4, 1, order='F') for n in bbox_valid])
-    bbox_valid = np.reshape(bbox_train, (-1, 4))
 
     if zca_whitening:
         # data whitening
@@ -37,9 +23,7 @@ def load_dataset(dataset_path, zca_whitening=True):
         x_train = np.reshape(white_x_train, x_train.shape)
         white_x_valid = np.dot(x_valid, principal_components)
         x_valid = np.reshape(white_x_valid, x_valid.shape)
-
-# ADDED
-    return x_train, y_train, x_valid, y_valid, bbox_train, bbox_valid
+    return x_train, y_train, x_valid, y_valid
 
 def zca_principal_components(x_train, zca_epsilon=0.1):
     """Calculate ZCA Matrix over training set and save 
@@ -59,6 +43,29 @@ def to_one_hot_encodings(label):
         idx = i * num_classes + label[i]
         vector[idx] = 1
     return vector
+
+def load_bbox(dataset_path):
+    bbox_train = np.load(os.path.join(dataset_path, "train_bboxes.npy"))
+    bbox_valid = np.load(os.path.join(dataset_path, "valid_bboxes.npy"))
+    bbox_train = bbox_train[:,:,:-2]
+    bbox_valid = bbox_valid[:,:,:-2]
+    return bbox_train, bbox_valid
+
+def crop_digits(data, labels, bboxes):
+    digit_1_data = []
+    digit_2_data = []
+    digit_1_labels = []
+    digit_2_labels = []
+    for i in range(len(bboxes)):
+        digits = data[i].reshape((64, 64))
+        digit_1 = digits[bboxes[i,0,0]:bboxes[i,0,0]+28, bboxes[i,0,1]:bboxes[i,0,1]+28]
+        digit_2 = digits[bboxes[i,1,0]:bboxes[i,1,0]+28, bboxes[i,1,1]:bboxes[i,1,1]+28]
+        digit_1_data.append(digit_1)
+        digit_2_data.append(digit_2)
+        digit_1_labels.append(labels[i,:10])
+        digit_2_labels.append(labels[i,10:])
+
+    return np.array(digit_1_data), np.array(digit_1_labels), np.array(digit_2_data), np.array(digit_2_labels)
 
 def batch_iter(data, batch_size, num_epochs, shuffle=True):
     """
