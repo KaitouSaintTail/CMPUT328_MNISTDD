@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 import datetime
 import data_helper
-from cnn_mnistdd_shallow import CNN
+from cnn_mnistdd_lenet import CNN
 import os
 
 # Parameters settings
@@ -82,9 +82,12 @@ train_summary_op = tf.summary.merge([loss_summary, acc_summary, hist_summaries_m
 train_summary_dir = os.path.join(out_dir, "summaries", "train")
 train_summary_writer = tf.summary.FileWriter(train_summary_dir, sess.graph)
 
+acc_list = []
+loss_list = []
+
 # Saver
 # Tensorflow assumes this directory already exists so we need to create it
-checkpoint_dir = os.path.abspath(os.path.join(out_dir, "checkpoints"))
+checkpoint_dir = os.path.join(out_dir, "checkpoints")
 checkpoint_prefix_1 = os.path.join(checkpoint_dir, "model_all")
 checkpoint_prefix_2 = os.path.join(checkpoint_dir, "model_one")
 checkpoint_prefix_3 = os.path.join(checkpoint_dir, "model_score")
@@ -162,6 +165,8 @@ for train_batch in train_batches:
         time_str = datetime.datetime.now().isoformat()
         all_true_acc = test_all_true/len(y_test)
         one_true_acc = test_one_true/len(y_test)
+        acc_list.append(all_true_acc)
+        loss_list.append(sum_loss/i)
         print("{}: Evaluation Summary, Epoch {}, Loss {:g}, All True Acc {:g}, One True Acc {:g}, Score {:g}".format(
               time_str, int(current_step//num_batches_per_epoch)+1, sum_loss/i, all_true_acc, one_true_acc, test_score))
         if all_true_acc > max_all_acc:
@@ -186,3 +191,6 @@ for train_batch in train_batches:
                 path = saver_3.save(sess, checkpoint_prefix_3, global_step=current_step)
                 print("Saved current model checkpoint with maxscore to {}".format(path))
         print("{}: Current Max Score {:g} in Iteration {}\n".format(time_str, max_score, max_score_step))
+
+np.save("acc_list.npy", np.array(acc_list))
+np.save("loss_list.npy", np.array(loss_list))
