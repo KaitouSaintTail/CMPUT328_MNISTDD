@@ -4,6 +4,7 @@ import datetime
 import data_helper
 from cnn_mnistdd_shallow import CNN
 import os
+import scipy.misc
 
 # Preprocessing Settings
 tf.flags.DEFINE_boolean("zca_whitening", False, "Enable usage of ZCA Whitening (default: False)")
@@ -71,6 +72,40 @@ def calculate_acc(y_preds):
     print("{}: Test Summary,  All True Acc {:g}, One True Acc {:g}, Score {:g}".format(time_str, all_true_acc, one_true_acc, score))
     return all_true_acc, one_true_acc, score
 
+def calculate_wrong_index(y_preds):
+    y_test = data_helper.load_test_labels()
+    res = np.count_nonzero((np.array(y_preds)-np.array(y_test))==0, axis=1)
+    y_one_wrong_index = []
+    y_both_wrong_index = []
+    for i in range(len(res)):
+        if (res[i] == 1):
+            y_one_wrong_index.append(i)
+        elif (res[i] == 0):
+			y_both_wrong_index.append(i)
+		else:
+			continue
+	return y_one_wrong_index, y_both_wrong_index
+
+def save_wrong_images(y_preds, y_one_wrong_index, y_both_wrong_index):
+	y_test = data_helper.load_test_labels()
+	x_test = data_helper.load_test_dataset()
+	for i in y_one_wrong_index:
+		img = x_test[i]
+		label = y_test[i]
+		wrong_pred = y_preds[i]
+		scipy.misc.imsave("/one_wrong/"+str(i)+".jpg", img)
+		text_file = open(str(i)+".txt", "w")
+		text_file.write("labels: " + str(label) + "\npredictions: " + str(wrong_pred))
+		text_file.close()
+	for i in y_both_wrong_index:
+		img = x_test[i]
+		label = y_test[i]
+		wrong_pred = y_preds[i]
+		scipy.misc.imsave("/both_wrong/"+str(i)+".jpg", img)
+		text_file = open(str(i)+".txt", "w")
+		text_file.write("labels: " + str(label) + "\npredictions: " + str(wrong_pred))
+		text_file.close()
+	
 if __name__ == "__main__":
     y_preds = test()
     all_true_acc, one_true_acc, score = calculate_acc(y_preds)
