@@ -2,7 +2,8 @@ import tensorflow as tf
 import numpy as np
 import datetime
 import data_helper
-from cnn_mnistdd_shallow import CNN
+from cnn_bbox_shallow import CNN
+#from cnn_bbox_vgg_half import CNN
 import os
 
 # Parameters settings
@@ -71,6 +72,8 @@ for var in tf.trainable_variables():
 hist_summaries_merged = tf.summary.merge(hist_summaries)
 grad_summaries = add_gradient_summaries(grads_and_vars)
 grad_summaries_merged = tf.summary.merge(grad_summaries)
+acc_list = []
+loss_list = []
 
 # Summaries for loss and accuracy
 loss_summary = tf.summary.scalar("loss", cnn.loss)
@@ -81,11 +84,13 @@ train_summary_writer = tf.summary.FileWriter(train_summary_dir, sess.graph)
 
 # Saver
 # Tensorflow assumes this directory already exists so we need to create it
-checkpoint_dir = os.path.abspath(os.path.join(out_dir, "checkpoints"))
-checkpoint_prefix = os.path.join(checkpoint_dir, "model_bbox_pred")
+checkpoint_dir = os.path.join(out_dir, "checkpoints")
+checkpoint_prefix_1 = os.path.join(checkpoint_dir, "model_bbox_all")
+checkpoint_prefix_2 = os.path.join(checkpoint_dir, "model_bbox_one")
 if not os.path.exists(checkpoint_dir):
     os.makedirs(checkpoint_dir)
-saver = tf.train.Saver(tf.global_variables(), max_to_keep=1)
+saver_1 = tf.train.Saver(tf.global_variables(), max_to_keep=1)
+saver_2 = tf.train.Saver(tf.global_variables(), max_to_keep=1)
 
 # Train Step and Dev Step
 def train_step(x_batch, y_batch):
@@ -114,6 +119,39 @@ def dev_step(x_batch, y_batch):
     time_str = datetime.datetime.now().isoformat()
     return preds, labels, loss
 
+def compute_intersection_over_union(predictions, ground_truth, threshold=0.5):
+    num_all_pass = 0
+    num_one_pass = 0
+    for i in range(len(predictions)):
+        ious = []
+        bbox_pred = predictions[i]
+        bbox_true = ground_truth[i]
+        for j in range(2):
+            xA = max(bbox_pred[j,0], bbox_true[j,0])
+            yA = max(bbox_pred[j,1], bbox_true[j,1])
+            xB = min(bbox_pred[j,0]+28, bbox_true[j,0]+28)
+            yB = min(bbox_pred[j,1]+28, bbox_true[j,1]+28)
+
+            #xB = min(bbox_pred[j,2], bbox_true[j,2])
+            #yB = min(bbox_pred[j,3], bbox_true[j,3])
+            # compute the area of intersection rectangle
+            interArea = (xB - xA + 1) * (yB - yA + 1)
+            #bbox_area_1 = (bbox_pred[j, 2] - bbox_pred[j, 0] + 1)*(bbox_pred[j, 3] - bbox_pred[j, 1] + 1)
+            bbox_area_1 = 29*29
+            bbox_area_2 = 29*29
+            # compute the intersection over union
+            iou = interArea / float(bbox_area_1 + bbox_area_2 - interArea)
+            ious.append(iou)
+        if ious[0] > threshold or ious[1] > threshold:
+            num_one_pass += 1
+            if ious[0] > threshold and ious[1] > threshold:
+                num_all_pass += 1
+    return num_all_pass/len(predictions), num_one_pass/len(predictions)
+
+max_all_acc = 0.0
+max_one_acc = 0.0
+max_all_step = 0
+max_one_step = 0
 # Generate batches
 train_batches = data_helper.batch_iter(list(zip(x_train, bbox_train)), FLAGS.batch_size, FLAGS.num_epochs)
 # Training loop. For each batch...
@@ -128,18 +166,31 @@ for train_batch in train_batches:
         sum_loss = 0
         i = 0
 
+        valid_bbox_preds = []
         for test_batch in test_batches:
             x_valid_batch, y_valid_batch = zip(*test_batch)
             preds, labels, test_loss = dev_step(x_valid_batch, y_valid_batch)
+            valid_bbox_preds.append(preds)
             sum_loss += test_loss
             i += 1
-
+        #print(preds[0])
+        #print(labels[0])
+        valid_bbox_preds = np.concatenate(valid_bbox_preds)
+        acc_all, acc_one = compute_intersection_over_union(valid_bbox_preds, bbox_valid)
+        acc_list.append(acc_all)
+        loss_list.append(sum_loss/i)
         time_str = datetime.datetime.now().isoformat()
-        print("{}: Evaluation Summary, Epoch {}, Loss {:g}".format(
-              time_str, int(current_step//num_batches_per_epoch)+1, sum_loss/i))
-        #if test_score > max_score:
-        #    max_score = test_score
-        #    max_score_step = current_step
-        #    if max_score>14650:
-        #        path = saver_3.save(sess, checkpoint_prefix_3, global_step=current_step)
-        #        print("Saved current model checkpoint with maxscore to {}".format(path))
+        print("{}: Evaluation Summary, Epoch {}, Loss {:g}, acc all {:g}, acc one {:g}".format(
+              time_str, int(current_step//num_batches_per_epoch)+1, sum_loss/i, acc_all, acc_one))
+        if acc_all > max_all_acc:
+            max_all_acc = acc_all
+            max_all_step = current_step
+            path = saver_1.save(sess, checkpoint_prefix_1, global_step=current_step)
+            print("Saved current model checkpoint with max all accuracy to {}".format(path))
+        print("{}: Current Max All Acc {:g} in Iteration {}".format(time_str, max_all_acc, max_all_step))
+        if acc_one > max_one_acc:
+            max_one_acc = acc_one
+            max_one_step = current_step
+            path = saver_2.save(sess, checkpoint_prefix_2, global_step=current_step)
+            print("Saved current model checkpoint with max one accuracy to {}".format(path))
+        print("{}: Current Max One Acc {:g} in Iteration {}".format(time_str, max_one_acc, max_one_step))

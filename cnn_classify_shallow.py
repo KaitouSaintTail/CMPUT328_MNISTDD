@@ -4,37 +4,6 @@ import numpy as np
 bias_initializer = tf.constant_initializer(0.1)
 kernel_initializer = tf.truncated_normal_initializer(stddev=0.1)
 
-# ADDED
-# Returns the number of predictions with bounding boxes that
-# meet the threshold for overlap (intersection over union)
-# with ground truth values
-# predictions and ground_truth have shape (?, num_digits, 2)
-def intersection_over_union(predictions, ground_truth, threshold):
-    valid = 0
-    for bbox_pred, bbox_gt in zip(predictions, ground_truth):
-        ious = []
-        for coords_pred, coords_gt in zip(bbox_pred, bbox_gt):
-            # compute the area of intersection
-            x_top_left = max(coords_gt[1], coords_pred[1])
-            y_top_left = max(coords_gt[0], coords_pred[0])
-            x_bottom_right = min(coords_gt[1], coords_pred[1]) + 28
-            y_bottom_right = min(coords_gt[0], coords_pred[0]) + 28
-
-            intersection = (x_bottom_right - x_top_left + 1) * (y_bottom_right - y_top_left + 1)
-
-            # compute the union
-            gtArea = predArea = 29 * 29
-            union = gtArea + predArea - intersection
-
-            # compute the intersection over union
-            ious.append(intersection / float(union))
-
-        iou = np.mean(ious)
-        if iou >= threshold:
-            valid += 1
-
-    return valid
-
 def Conv(inputs, kernel_size, strides, num_filters, weight_decay, name):
     '''
     Helper function to create a Conv2D layer
@@ -61,11 +30,11 @@ def fc(inputs, dropout_keep_prob, num_outputs, name):
     return out
 
 class CNN():
-    def __init__(self, num_classes=2, num_digits=2, weight_decay=5e-4):
+    def __init__(self, num_classes=10, weight_decay=5e-4):
         # input tensors
-        self.input_x = tf.placeholder(tf.float32, [None, 64*64], name="input_x")
-        self.input_x_reshaped = tf.reshape(self.input_x, [-1, 64, 64, 1])
-        self.input_y = tf.placeholder(tf.float32, [None, num_digits, num_classes], name="input_y")
+        self.input_x = tf.placeholder(tf.float32, [None, 28, 28], name="input_x")
+        self.input_x_reshaped = tf.reshape(self.input_x, [-1, 28, 28, 1])
+        self.input_y = tf.placeholder(tf.float32, [None, num_classes], name="input_y")
         self.dropout_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
 
         # CNN Architecture
@@ -87,14 +56,19 @@ class CNN():
         self.fc1 = fc(inputs=self.flatten, dropout_keep_prob=self.dropout_keep_prob, num_outputs=1024, name='fc1')
 
         with tf.variable_scope('fc'):
-            w = tf.get_variable('w', [self.fc1.get_shape()[1], num_classes*num_digits], initializer=kernel_initializer)
-            b = tf.get_variable('b', [num_classes*num_digits], initializer=bias_initializer)
-            out = tf.matmul(self.fc1, w) + b
-            self.fc = tf.reshape(out, [-1, num_digits, num_classes])
+            w = tf.get_variable('w', [self.fc1.get_shape()[1], num_classes], initializer=kernel_initializer)
+            b = tf.get_variable('b', [num_classes], initializer=bias_initializer)
+            self.fc = tf.matmul(self.fc1, w) + b
 
         # L2 euclidean loss
-        with tf.name_scope("bbox_loss"):
-            self.predictions = self.fc
-            self.ground_truth = self.input_y
+        with tf.name_scope("loss"):
+            self.predictions = tf.argmax(self.fc, 1, name="predictions")
+            self.ground_truth = tf.argmax(self.input_y, 1, name="predictions")
+            losses = tf.nn.softmax_cross_entropy_with_logits(logits=self.fc, labels=self.input_y)
             regularization_losses = sum(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
-            self.loss = tf.reduce_mean(tf.sqrt(tf.square(tf.subtract(self.ground_truth, self.predictions)))) + regularization_losses
+            self.loss = tf.reduce_mean(losses) + regularization_losses
+
+        # Accuracy
+        with tf.name_scope("accuracy"):
+            self.correct_predictions = tf.equal(self.predictions, self.ground_truth)
+            self.accuracy = tf.reduce_mean(tf.cast(self.correct_predictions, "float"), name="accuracy")

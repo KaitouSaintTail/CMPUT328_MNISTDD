@@ -1,5 +1,6 @@
 import numpy as np
 import os
+import scipy.misc
 
 num_classes = 10
 num_digits = 2
@@ -46,20 +47,44 @@ def to_one_hot_encodings(label):
 
 def load_bbox(dataset_path):
     bbox_train = np.load(os.path.join(dataset_path, "train_bboxes.npy"))
+    #bbox_valid = np.load(os.path.join(dataset_path, "bbox_valid_generated.npy"))
     bbox_valid = np.load(os.path.join(dataset_path, "valid_bboxes.npy"))
     bbox_train = bbox_train[:,:,:-2]
     bbox_valid = bbox_valid[:,:,:-2]
     return bbox_train, bbox_valid
+
+def load_test_bbox():
+    bbox_test = np.load("bbox_valid_generated.npy")
+    return bbox_test
 
 def crop_digits(data, labels, bboxes):
     digit_1_data = []
     digit_2_data = []
     digit_1_labels = []
     digit_2_labels = []
+    bboxes =bboxes.clip(min=0, max=63)
     for i in range(len(bboxes)):
         digits = data[i].reshape((64, 64))
+        #print(bboxes[i])
+        if bboxes[i,0,0]+28 > 64:
+            bboxes[i,0,0] = bboxes[i,0,0]+28 - 64
+        if bboxes[i,0,1]+28 > 64:
+            bboxes[i,0,1] = bboxes[i,0,1]+28 - 64
+        if bboxes[i,1,0]+28 > 64:
+            bboxes[i,1,0] = bboxes[i,1,0]+28 - 64
+        if bboxes[i,1,1]+28 > 64:
+            bboxes[i,1,1] = bboxes[i,1,1]+28 - 64 
         digit_1 = digits[bboxes[i,0,0]:bboxes[i,0,0]+28, bboxes[i,0,1]:bboxes[i,0,1]+28]
         digit_2 = digits[bboxes[i,1,0]:bboxes[i,1,0]+28, bboxes[i,1,1]:bboxes[i,1,1]+28]
+        if digit_1.shape != (28, 28):
+            print(digit_1.shape)
+            exit()
+        if digit_2.shape!=(28, 28):
+            print(digit_2.shape)
+            exit()
+            
+        #digit_1 = digits[bboxes[i,0,0]:bboxes[i,0,2], bboxes[i,0,1]:bboxes[i,0,3]]
+        #digit_2 = digits[bboxes[i,1,0]:bboxes[i,1,2], bboxes[i,1,1]:bboxes[i,1,3]]
         digit_1_data.append(digit_1)
         digit_2_data.append(digit_2)
         digit_1_labels.append(labels[i,:10])
