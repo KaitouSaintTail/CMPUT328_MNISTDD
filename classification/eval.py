@@ -6,7 +6,7 @@ from cnn_mnistdd_vgg_half import CNN
 import os
 
 # Preprocessing Settings
-tf.flags.DEFINE_boolean("zca_whitening", False, "Enable usage of ZCA Whitening (default: False)")
+tf.flags.DEFINE_boolean("zca_whitening", True, "Enable usage of ZCA Whitening (default: False)")
 tf.flags.DEFINE_string("database_path", "dataset/", "Path for the dataset to be used.")
 tf.flags.DEFINE_string("checkpoint_path", "checkpoints/", "Path for the dataset to be used.")
 tf.flags.DEFINE_integer("batch_size", 128, "Batch Size (default: 64)")
@@ -71,4 +71,5 @@ for test_batch in test_batches:
 time_str = datetime.datetime.now().isoformat()
 all_true_acc = test_all_true/len(y_test)
 one_true_acc = test_one_true/len(y_test)
-print("{}: Evaluation Summary, Epoch {}, Loss {:g}, All True Acc {:g}, One True Acc {:g}".format(time_str, int(current_step//num_batches_per_epoch)+1, sum_loss/i, all_true_acc, one_true_acc))
+score = test_all_true*3 + test_one_true - test_all_true
+print("{}: Evaluation Summary, Epoch {}, Loss {:g}, All True Acc {:g}, One True Acc {:g}, Score {:g}".format(time_str, int(current_step//num_batches_per_epoch)+1, sum_loss/i, all_true_acc, one_true_acc, score))

@@ -26,6 +26,20 @@ def load_dataset(dataset_path, zca_whitening=True):
 
     return x_train, y_train, x_valid, y_valid
 
+def load_test_dataset(zca_whitening=True):
+    x_test = np.load("test_X.npy").astype('float32')/255.
+    if zca_whitening:
+        # data whitening
+        principal_components = np.load("x_train_zca.npy")
+        print("Shape of ZCA Matrix:", principal_components.shape)
+        white_x_test = np.dot(x_test, principal_components)
+        x_test = np.reshape(white_x_test, x_test.shape)
+    return x_test
+
+def load_test_labels():
+    y_test = np.array(np.load("test_Y.npy"))
+    return y_test
+
 def zca_principal_components(x_train, zca_epsilon=0.1):
     """Calculate ZCA Matrix over training set and save 
     ZCA matrix as a numpy format file."""
